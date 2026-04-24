@@ -1,0 +1,84 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(CLIENT)
+  createdAt    DateTime @default(now())
+
+  provider     Provider?
+  appointments Appointment[] @relation("ClientAppointments")
+}
+
+model Provider {
+  id           Int      @id @default(autoincrement())
+  userId       Int      @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessName String
+  description  String?
+  location     String
+  phone        String
+  category     String   @default("General")
+  verified     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  services     Service[]
+  portfolios   Portfolio[]
+  appointments Appointment[]
+}
+
+model Service {
+  id          Int      @id @default(autoincrement())
+  providerId  Int
+  provider    Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  serviceName String
+  description String?
+  durationMin Int
+  price       Float
+  createdAt   DateTime @default(now())
+
+  appointments Appointment[]
+}
+
+model Appointment {
+  id         Int               @id @default(autoincrement())
+  clientId   Int
+  client     User              @relation("ClientAppointments", fields: [clientId], references: [id])
+  serviceId  Int
+  service    Service           @relation(fields: [serviceId], references: [id])
+  providerId Int
+  provider   Provider          @relation(fields: [providerId], references: [id])
+  apptDate   DateTime
+  status     AppointmentStatus @default(PENDING)
+  createdAt  DateTime          @default(now())
+}
+
+model Portfolio {
+  id         Int      @id @default(autoincrement())
+  providerId Int
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  imageUrl   String
+  caption    String?
+  uploadedAt DateTime @default(now())
+}
+
+enum Role {
+  CLIENT
+  PROVIDER
+  ADMIN
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
