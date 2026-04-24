@@ -198,3 +198,4 @@ beauty-platform/
 ## Notes for Thesis Documentation
 
 The system was designed using PHP/MySQL as specified in the thesis. For live deployment, Next.js (Node.js) and PostgreSQL were used due to their native compatibility with the Vercel hosting platform. The database schema, entity relationships, security architecture, and functional requirements described in the thesis are fully implemented — only the server-side language and hosting environment differ from the design specification. All five tables (Users, Providers, Services, Appointments, Portfolios) are implemented as specified in Chapter 3.
+# Booqd
