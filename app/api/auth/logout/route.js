@@ -3,6 +3,6 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 
 export async function POST() {
-  cookies().delete('auth_token')
-  return NextResponse.redirect(new URL('/', process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'))
+  (await cookies()).delete('auth_token')
+  return new NextResponse(null, { status: 303, headers: { Location: '/' } })
 }

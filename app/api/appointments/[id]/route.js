@@ -2,12 +2,16 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
+import { canTransition } from '@/lib/booking-rules.cjs'
 
 export async function PATCH(req, { params }) {
+  params = await params
   try {
     const session = await getSession()
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+    const id = Number(params.id)
+    if (!Number.isSafeInteger(id) || id < 1) return NextResponse.json({ error: 'Invalid booking ID' }, { status: 400 })
     const { status } = await req.json()
     const validStatuses = ['CONFIRMED', 'CANCELLED', 'COMPLETED']
     if (!validStatuses.includes(status)) {
@@ -15,7 +19,7 @@ export async function PATCH(req, { params }) {
     }
 
     const appt = await prisma.appointment.findUnique({
-      where: { id: parseInt(params.id) },
+      where: { id: id },
       include: { provider: true },
     })
     if (!appt) return NextResponse.json({ error: 'Appointment not found' }, { status: 404 })
@@ -29,9 +33,15 @@ export async function PATCH(req, { params }) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const updated = await prisma.appointment.update({
-      where: { id: parseInt(params.id) },
-      data: { status },
+    if (!canTransition(appt.status, status)) {
+      return NextResponse.json({ error: 'This booking status cannot be changed that way' }, { status: 409 })
+    }
+    const result = await prisma.appointment.updateMany({
+      where: { id, status: appt.status }, data: { status },
+    })
+    if (!result.count) return NextResponse.json({ error: 'Booking changed. Refresh and try again.' }, { status: 409 })
+    const updated = await prisma.appointment.findUnique({
+      where: { id: id },
     })
 
     return NextResponse.json(updated)

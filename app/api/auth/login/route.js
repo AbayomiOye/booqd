@@ -23,7 +23,8 @@ export async function POST(req) {
     }
 
     const token = signToken({ id: user.id, name: user.name, email: user.email, role: user.role })
-    cookies().set('auth_token', token, {
+    const cookieStore = await cookies()
+    cookieStore.set('auth_token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',

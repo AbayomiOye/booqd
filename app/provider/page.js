@@ -20,7 +20,7 @@ export default async function ProviderDashboard() {
           service: true,
         },
         orderBy: { apptDate: 'asc' },
-        take: 20,
+
       },
     },
   })

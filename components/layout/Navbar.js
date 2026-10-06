@@ -31,6 +31,7 @@ export default async function Navbar() {
 
         {/* Auth */}
         <div className="flex items-center gap-2">
+          {session && <Link href="/bookings" className="btn-ghost text-sm">My bookings</Link>}
           {session ? (
             <div className="flex items-center gap-3">
               <span className="hidden md:block text-sm text-gray-600">

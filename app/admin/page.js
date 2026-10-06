@@ -31,7 +31,7 @@ export default async function AdminPage() {
     appointments: appointments.length,
     revenue: appointments
       .filter(a => a.status === 'COMPLETED')
-      .reduce((sum, a) => sum + (a.service?.price || 0), 0),
+      .reduce((sum, a) => sum + (a.price || 0), 0),
   }
 
   const statusColors = { PENDING:'badge-yellow', CONFIRMED:'badge-green', CANCELLED:'badge-red', COMPLETED:'badge-gray' }
@@ -103,10 +103,10 @@ export default async function AdminPage() {
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-gray-900 truncate">{a.client.name}</p>
                     <p className="text-xs text-gray-500">
-                      {a.service.serviceName} @ {a.provider.businessName}
+                      {a.serviceName} @ {a.provider.businessName}
                     </p>
                     <p className="text-xs text-gray-400">
-                      {new Date(a.apptDate).toLocaleDateString('en-NG', { day:'numeric', month:'short' })}
+                      {new Date(a.apptDate).toLocaleDateString('en-NG', { timeZone:'Africa/Lagos', day:'numeric', month:'short' })}
                     </p>
                   </div>
                   <span className={statusColors[a.status] || 'badge-gray'}>{a.status}</span>

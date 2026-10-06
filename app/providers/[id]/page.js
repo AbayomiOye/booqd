@@ -6,6 +6,7 @@ import Navbar from '@/components/layout/Navbar'
 import BookingForm from './BookingForm'
 
 export default async function ProviderPage({ params }) {
+  params = await params
   const provider = await prisma.provider.findUnique({
     where: { id: parseInt(params.id) },
     include: {

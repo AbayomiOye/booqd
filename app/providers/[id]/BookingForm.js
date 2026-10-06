@@ -1,6 +1,7 @@
 // app/providers/[id]/BookingForm.js
 'use client'
 import { useState } from 'react'
+import Link from 'next/link'
 
 export default function BookingForm({ services, providerId, clientId }) {
   const [serviceId, setServiceId] = useState(services[0]?.id || '')
@@ -26,26 +27,32 @@ export default function BookingForm({ services, providerId, clientId }) {
     if (!serviceId || !date || !time) { setError('Please fill all fields'); return }
     setLoading(true)
     setError('')
-    const res = await fetch('/api/appointments', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ serviceId: parseInt(serviceId), providerId, clientId, date, time }),
-    })
-    const data = await res.json()
-    if (!res.ok) { setError(data.error || 'Booking failed'); setLoading(false); return }
-    setSuccess(true)
-    setLoading(false)
+    try {
+      const res = await fetch('/api/appointments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ serviceId: Number(serviceId), providerId, date, time }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Booking failed')
+      setSuccess(true)
+    } catch (err) {
+      setError(err.message || 'Could not connect. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   if (success) {
     return (
       <div className="text-center py-4">
         <div className="text-4xl mb-3">🎉</div>
-        <h3 className="font-bold text-gray-900 text-lg">Booking confirmed!</h3>
+        <h3 className="font-bold text-gray-900 text-lg">Booking requested!</h3>
         <p className="text-gray-500 text-sm mt-2">
           Your appointment has been requested.<br />
           The provider will confirm shortly.
         </p>
+        <Link href="/bookings" className="btn-primary mt-4 w-full">View my bookings</Link>
         <button onClick={() => { setSuccess(false); setDate(''); setTime('') }}
           className="btn-outline mt-4 w-full">Book another</button>
       </div>
@@ -100,7 +107,7 @@ export default function BookingForm({ services, providerId, clientId }) {
       </button>
 
       <p className="text-xs text-gray-400 text-center">
-        Free cancellation up to 24 hours before your appointment
+        Appointment times are in Nigeria time (WAT).
       </p>
     </form>
   )

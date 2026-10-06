@@ -45,14 +45,6 @@ export default function LoginPage() {
             <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl mb-4">{error}</div>
           )}
 
-          {/* Demo credentials */}
-          <div className="bg-brand-50 border border-brand-200 rounded-xl p-3 mb-5 text-xs text-brand-800">
-            <p className="font-semibold mb-1">Demo accounts:</p>
-            <p>Client: client@booqd.ng / password123</p>
-            <p>Provider: zara@booqd.ng / password123</p>
-            <p>Admin: admin@booqd.ng / admin1234</p>
-          </div>
-
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="label">Email address</label>

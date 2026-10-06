@@ -6,3 +6,8 @@ node_modules/
 out/
 *.log
 .DS_Store
+
+playwright-report/
+test-results/
+.vercel
+.env*

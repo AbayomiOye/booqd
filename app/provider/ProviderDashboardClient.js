@@ -11,16 +11,20 @@ const statusColors = {
 
 function AppointmentsTab({ appointments }) {
   const [appts, setAppts] = useState(appointments)
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(null)
 
   async function updateStatus(id, status) {
-    const res = await fetch(`/api/appointments/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
-    })
-    if (res.ok) {
-      setAppts(prev => prev.map(a => a.id === id ? { ...a, status } : a))
-    }
+    setError(''); setBusy(id)
+    try {
+      const res = await fetch(`/api/appointments/${id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Could not update booking')
+      setAppts(prev => prev.map(a => a.id === id ? { ...a, status: data.status } : a))
+    } catch (err) { setError(err.message) } finally { setBusy(null) }
   }
 
   const upcoming = appts.filter(a => ['PENDING','CONFIRMED'].includes(a.status))
@@ -33,23 +37,23 @@ function AppointmentsTab({ appointments }) {
           <span className="font-medium text-gray-900">{a.client.name}</span>
           <span className={statusColors[a.status] || 'badge-gray'}>{a.status}</span>
         </div>
-        <p className="text-sm text-gray-500 mt-0.5">{a.service.serviceName}</p>
+        <p className="text-sm text-gray-500 mt-0.5">{a.serviceName}</p>
         <p className="text-sm text-gray-400 mt-0.5">
-          {new Date(a.apptDate).toLocaleDateString('en-NG', { weekday:'short', day:'numeric', month:'short', year:'numeric' })}
+          {new Date(a.apptDate).toLocaleDateString('en-NG', { timeZone:'Africa/Lagos', weekday:'short', day:'numeric', month:'short', year:'numeric' })}
           {' · '}
-          {new Date(a.apptDate).toLocaleTimeString('en-NG', { hour:'2-digit', minute:'2-digit' })}
+          {new Date(a.apptDate).toLocaleTimeString('en-NG', { timeZone:'Africa/Lagos', hour:'2-digit', minute:'2-digit' })}
         </p>
       </div>
       {a.status === 'PENDING' && (
         <div className="flex gap-2 shrink-0">
-          <button onClick={() => updateStatus(a.id, 'CONFIRMED')}
+          <button disabled={busy !== null} onClick={() => updateStatus(a.id, 'CONFIRMED')}
             className="text-xs btn-primary py-1.5 px-3">Confirm</button>
-          <button onClick={() => updateStatus(a.id, 'CANCELLED')}
+          <button disabled={busy !== null} onClick={() => updateStatus(a.id, 'CANCELLED')}
             className="text-xs btn-ghost text-red-600 hover:bg-red-50 py-1.5 px-3">Decline</button>
         </div>
       )}
       {a.status === 'CONFIRMED' && (
-        <button onClick={() => updateStatus(a.id, 'COMPLETED')}
+        <button disabled={busy !== null} onClick={() => updateStatus(a.id, 'COMPLETED')}
           className="text-xs btn-outline py-1.5 px-3 shrink-0">Mark done</button>
       )}
     </div>
@@ -57,6 +61,7 @@ function AppointmentsTab({ appointments }) {
 
   return (
     <div className="card p-6">
+      {error && <p role="alert" className="text-red-700 mb-4">{error}</p>}
       {upcoming.length === 0 && past.length === 0 ? (
         <div className="text-center py-10 text-gray-400">
           <p className="text-4xl mb-3">🗓</p>

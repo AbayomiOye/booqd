@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 
 export async function DELETE(req, { params }) {
+  params = await params
   try {
     const session = await getSession()
     if (!session || session.role !== 'PROVIDER') {
@@ -17,6 +18,8 @@ export async function DELETE(req, { params }) {
     if (service.provider.userId !== session.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
+    const bookings = await prisma.appointment.count({ where: { serviceId: service.id } })
+    if (bookings) return NextResponse.json({ error: 'This service has booking history and cannot be deleted' }, { status: 409 })
     await prisma.service.delete({ where: { id: parseInt(params.id) } })
     return NextResponse.json({ success: true })
   } catch (err) {

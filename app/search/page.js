@@ -31,6 +31,7 @@ async function search({ q, category, location }) {
 const CATEGORIES = ['All','Makeup & Hair','Nails','Skincare','Lashes','Braiding','Spa']
 
 export default async function SearchPage({ searchParams }) {
+  searchParams = await searchParams
   const q = searchParams?.q || ''
   const category = searchParams?.category === 'All' ? '' : (searchParams?.category || '')
   const location = searchParams?.location || ''

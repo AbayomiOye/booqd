@@ -49,6 +49,8 @@ model Service {
   createdAt   DateTime @default(now())
 
   appointments Appointment[]
+
+  @@index([providerId])
 }
 
 model Appointment {
@@ -62,6 +64,14 @@ model Appointment {
   apptDate   DateTime
   status     AppointmentStatus @default(PENDING)
   createdAt  DateTime          @default(now())
+  endsAt     DateTime
+  serviceName String
+  price      Float
+  durationMin Int
+
+  @@index([clientId, apptDate])
+  @@index([providerId, apptDate])
+  @@index([serviceId])
 }
 
 model Portfolio {
@@ -71,6 +81,8 @@ model Portfolio {
   imageUrl   String
   caption    String?
   uploadedAt DateTime @default(now())
+
+  @@index([providerId])
 }
 
 enum Role {
