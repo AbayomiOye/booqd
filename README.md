@@ -22,6 +22,8 @@ Bookings save client, provider and service IDs, start/end times, status, and the
 
 Signed-in customers can retrieve their bookings at `/bookings` and cancel active bookings. Providers retrieve their appointments in `/provider` and confirm, decline or complete them. API access is restricted by verified sessions and current database roles. JWT secrets must have at least 32 characters.
 
+Production runtime uses Supabase transaction pooling (6543, `pgbouncer=true`, `connection_limit=1`); the session pooler is reserved for migration commands. The Prisma singleton also caps production runtime pools at one connection per process.
+
 The app retains its own account system; Supabase supplies Postgres. Browser `anon` and `authenticated` roles have no direct table privileges, and RLS is enabled on all app tables. Database access through Prisma uses a trusted server database role; never put its connection string in a `NEXT_PUBLIC_` variable. A Supabase publishable key alone cannot operate this integration.
 
 ## Before public launch
