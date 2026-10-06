@@ -5,7 +5,7 @@ const { randomUUID } = require('node:crypto')
 const prisma = new PrismaClient()
 const marker = randomUUID()
 const password = randomUUID() + 'aA1!'
-let client, outsider, providerUser, provider, service
+let client, outsider, providerUser, provider, service, admin
 const future = day => new Date(Date.now() + day * 86400000).toISOString().slice(0, 10)
 // Run authenticated API checks inside Chrome so its secure localhost cookies
 // follow the same rules as the application's own fetch requests.
@@ -25,14 +25,15 @@ function browserApi(page) {
 }
 async function login(page, user) {
   await page.goto('/login')
-  await page.getByPlaceholder('you@email.com').fill(user.email)
+  await page.getByPlaceholder('you@email.com').fill(user.email.toUpperCase())
   await page.locator('input[type="password"]').fill(password)
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
-  await expect(page).toHaveURL(user.role === 'PROVIDER' ? /\/provider$/ : /\/search$/)
+  await expect(page).toHaveURL(user.role === 'PROVIDER' ? /\/provider$/ : user.role === 'ADMIN' ? /\/admin$/ : /\/search$/)
 }
 
 test.beforeAll(async () => {
   const passwordHash = await bcrypt.hash(password, 12)
+  admin = await prisma.user.create({ data: { name: 'E2E Admin', email: `e2e-admin-${marker}@example.invalid`, passwordHash, role: 'ADMIN' } })
   client = await prisma.user.create({ data: { name: 'E2E Booking Client', email: `e2e-client-${marker}@example.invalid`, passwordHash } })
   outsider = await prisma.user.create({ data: { name: 'E2E Other Client', email: `e2e-other-${marker}@example.invalid`, passwordHash } })
   providerUser = await prisma.user.create({ data: { name: 'E2E Provider', email: `e2e-provider-${marker}@example.invalid`, passwordHash, role: 'PROVIDER' } })
@@ -40,13 +41,15 @@ test.beforeAll(async () => {
   service = await prisma.service.create({ data: { providerId: provider.id, serviceName: 'E2E Hair Appointment', durationMin: 60, price: 5000 } })
 })
 test.afterAll(async () => {
+  const fixtureUsers = await prisma.user.findMany({ where: { email: { in: [`e2e-client-${marker}@example.invalid`, `e2e-other-${marker}@example.invalid`, `e2e-provider-${marker}@example.invalid`, `e2e-register-${marker}@example.invalid`, `e2e-admin-${marker}@example.invalid`, `e2e-role-attempt-${marker}@example.invalid`] } }, select: { id: true } })
+  await prisma.activity.deleteMany({ where: { actorId: { in: fixtureUsers.map(u => u.id) } } })
   // Delete only this run's disposable fixtures, never existing users/bookings.
   if (provider) {
     await prisma.appointment.deleteMany({ where: { providerId: provider.id } })
     await prisma.service.deleteMany({ where: { providerId: provider.id } })
     await prisma.provider.delete({ where: { id: provider.id } })
   }
-  await prisma.user.deleteMany({ where: { email: { in: [`e2e-client-${marker}@example.invalid`, `e2e-other-${marker}@example.invalid`, `e2e-provider-${marker}@example.invalid`, `e2e-register-${marker}@example.invalid`] } } })
+  await prisma.user.deleteMany({ where: { email: { in: [`e2e-client-${marker}@example.invalid`, `e2e-other-${marker}@example.invalid`, `e2e-provider-${marker}@example.invalid`, `e2e-register-${marker}@example.invalid`, `e2e-admin-${marker}@example.invalid`, `e2e-role-attempt-${marker}@example.invalid`] } } })
   await prisma.$disconnect()
 })
 
@@ -223,4 +226,62 @@ test('homepage is usable on mobile and makes no unsupported platform size claims
   await expect(page.getByText('10,000+', { exact: true })).toHaveCount(0)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   await page.screenshot({ path: '/private/tmp/booqd-home-mobile.png', fullPage: true })
+})
+
+
+test('admin sees accurate totals and activity, without exposing password hashes', async ({ page }) => {
+  await login(page, client)
+  const made = await browserApi(page).post('/api/appointments', { data: { serviceId: service.id, providerId: provider.id, date: future(15), time: '13:00' } })
+  expect(made.status()).toBe(201)
+  const booking = await made.json()
+  expect((await browserApi(page).patch(`/api/appointments/${booking.appointmentId}`, { data: { status: 'CANCELLED' } })).status()).toBe(200)
+  await login(page, admin)
+  await expect(page.getByRole('heading', { name: 'Platform activity', exact: true })).toBeVisible()
+  const result = await browserApi(page).get('/api/admin/overview')
+  expect(result.status()).toBe(200)
+  const data = await result.json()
+  expect(data.stats.userCount).toBe(await prisma.user.count())
+  expect(data.stats.bookingCount).toBe(await prisma.appointment.count())
+  expect(JSON.stringify(data)).not.toContain('passwordHash')
+  await page.getByRole('link', { name: 'Activity', exact: true }).click()
+  await expect(page).toHaveURL(/tab=activity/)
+  await page.getByLabel('Search activity').fill('E2E Booking Client')
+  await page.getByRole('button', { name: 'Apply filters' }).click()
+  await expect(page.getByRole('article').filter({ hasText: 'changed booking' }).first()).toBeVisible()
+  await page.getByRole('link', { name: 'Bookings', exact: true }).click()
+  await expect(page).toHaveURL(/tab=bookings/)
+  await expect(page.getByRole('article').filter({ hasText: service.serviceName }).first()).toBeVisible()
+  await page.getByRole('link', { name: 'Providers', exact: true }).click()
+  await expect(page).toHaveURL(/tab=providers/)
+  await expect(page.getByRole('link', { name: provider.businessName, exact: true })).toBeVisible()
+  await page.getByRole('link', { name: 'Users', exact: true }).click()
+  await expect(page).toHaveURL(/tab=users/)
+  await page.getByLabel('Search users').fill(marker)
+  await page.getByRole('button', { name: 'Apply filters' }).click()
+  await expect(page.getByText(client.email, { exact: true })).toBeVisible()
+  const users = await (await browserApi(page).get(`/api/admin/overview?tab=users&q=${marker}`)).json()
+  expect(JSON.stringify(users)).not.toContain('passwordHash')
+  await page.getByRole('link', { name: 'Overview', exact: true }).click()
+  await expect(page).toHaveURL(/tab=overview/)
+  await page.setViewportSize({ width: 375, height: 812 })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await page.screenshot({ path: '/private/tmp/booqd-admin-mobile.png', fullPage: true })
+})
+
+test('non-admins and forged cookies cannot access dashboard data', async ({ page, request, browser }) => {
+  expect((await request.get('/api/admin/overview')).status()).toBe(401)
+  await login(page, client)
+  expect((await browserApi(page).get('/api/admin/overview')).status()).toBe(403)
+  await page.goto('/admin')
+  await expect(page).toHaveURL(/\/search$/)
+  const attempted = await browserApi(page).post('/api/auth/register', { data: { name: 'E2E Role Attempt', email: `e2e-role-attempt-${marker}@example.invalid`, password, role: 'ADMIN' } })
+  expect((await attempted.json()).role).toBe('CLIENT')
+  expect((await browserApi(page).get('/api/admin/overview')).status()).toBe(403)
+  const context = await browser.newContext()
+  const forged = ['eyJhbGciOiJIUzI1NiJ9', Buffer.from(JSON.stringify({ id: client.id, role: 'ADMIN' })).toString('base64url'), 'fake'].join('.')
+  await context.addCookies([{ name: 'auth_token', value: forged, url: process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:3100' }])
+  const fake = await context.newPage()
+  await fake.goto('/login')
+  expect((await browserApi(fake).get('/api/admin/overview')).status()).toBe(401)
+  await context.close()
 })

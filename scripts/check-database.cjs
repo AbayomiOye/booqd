@@ -19,10 +19,12 @@ async function main() {
       assert.equal(saved.price, 1000)
       await tx.appointment.update({ where: { id: booking.id }, data: { status: 'CANCELLED' } })
       assert.equal((await tx.appointment.findUnique({ where: { id: booking.id } })).status, 'CANCELLED')
-      const tables = await tx.$queryRaw`SELECT relname, relrowsecurity FROM pg_class WHERE relnamespace = 'public'::regnamespace AND relname IN ('User', 'Provider', 'Service', 'Appointment', 'Portfolio')`
-      assert.equal(tables.length, 5)
+      const activity = await tx.activity.create({ data: { actorId: client.id, action: 'VERIFICATION', summary: 'Admin activity storage verification' } })
+      assert.equal((await tx.activity.findUnique({ where: { id: activity.id } })).actorId, client.id)
+      const tables = await tx.$queryRaw`SELECT relname, relrowsecurity FROM pg_class WHERE relnamespace = 'public'::regnamespace AND relname IN ('User', 'Provider', 'Service', 'Appointment', 'Portfolio', 'Activity')`
+      assert.equal(tables.length, 6)
       assert.ok(tables.every(t => t.relrowsecurity), 'Every app table must have RLS enabled')
-      const grants = await tx.$queryRaw`SELECT table_name FROM information_schema.role_table_grants WHERE table_schema = 'public' AND table_name IN ('User', 'Provider', 'Service', 'Appointment', 'Portfolio') AND grantee IN ('anon', 'authenticated')`
+      const grants = await tx.$queryRaw`SELECT table_name FROM information_schema.role_table_grants WHERE table_schema = 'public' AND table_name IN ('User', 'Provider', 'Service', 'Appointment', 'Portfolio', 'Activity') AND grantee IN ('anon', 'authenticated')`
       assert.equal(grants.length, 0, 'Browser roles must not have direct access')
       throw rollback
     })

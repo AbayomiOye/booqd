@@ -1,6 +1,7 @@
 // app/api/appointments/[id]/route.js
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { recordActivity } from '@/lib/activity'
 import { getSession } from '@/lib/auth'
 import { canTransition } from '@/lib/booking-rules.cjs'
 
@@ -36,13 +37,13 @@ export async function PATCH(req, { params }) {
     if (!canTransition(appt.status, status)) {
       return NextResponse.json({ error: 'This booking status cannot be changed that way' }, { status: 409 })
     }
-    const result = await prisma.appointment.updateMany({
-      where: { id, status: appt.status }, data: { status },
+    const updated = await prisma.$transaction(async tx => {
+      const result = await tx.appointment.updateMany({ where: { id, status: appt.status }, data: { status } })
+      if (!result.count) return null
+      await recordActivity(tx, session.id, 'BOOKING_UPDATED', `${session.name} changed booking #${id} to ${status.toLowerCase()}`, { bookingId: id, from: appt.status, to: status })
+      return tx.appointment.findUnique({ where: { id } })
     })
-    if (!result.count) return NextResponse.json({ error: 'Booking changed. Refresh and try again.' }, { status: 409 })
-    const updated = await prisma.appointment.findUnique({
-      where: { id: id },
-    })
+    if (!updated) return NextResponse.json({ error: 'Booking changed. Refresh and try again.' }, { status: 409 })
 
     return NextResponse.json(updated)
   } catch (err) {

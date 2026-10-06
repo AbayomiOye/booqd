@@ -33,6 +33,13 @@ The app retains its own account system; Supabase supplies Postgres. Browser `ano
 
 UI upgrades add live service availability, a booking review step, accessible search/location/budget/category filters, upcoming/past booking history, saved weekly provider hours and a provider calendar. Availability returns only time slots, never customer details. Booking creation validates the saved schedule inside the existing provider lock. Changing hours does not alter existing appointments.
 
-Run the 11 Playwright scenarios with `npm run test:e2e`. To verify an already deployed site, set `PLAYWRIGHT_BASE_URL=https://booqd-wine.vercel.app` when running that command. The suite still uses the database from `.env` for its disposable fixtures, so it must match the deployed project.
+Run the 13 Playwright scenarios with `npm run test:e2e`. To verify an already deployed site, set `PLAYWRIGHT_BASE_URL=https://booqd-wine.vercel.app` when running that command. The suite still uses the database from `.env` for its disposable fixtures, so it must match the deployed project.
 
 Payments, notifications, review collection and portfolio uploads are not implemented. Portfolio displays use actual saved images or clearly neutral placeholders.
+
+
+## Admin activity dashboard
+
+`/admin` is restricted to current database `ADMIN` roles, with the same gate on `/api/admin/overview`. It shows accurate all-time totals, booking statuses, completed service value (not collected revenue), a 14-day booking trend, and searchable/paginated activity, bookings, providers and users. Activity records start with this release and record successful sign-ins, registrations, booking requests/status changes, service changes and working-hour edits. Mutation logs are written in the same transaction as the change. Passwords/hashes/tokens are never included in the dashboard payload.
+
+The designated administrator must register with her own password. After the platform owner confirms she controls that account, use `node --env-file=.env scripts/grant-admin.cjs "confirmed-admin@example.com"`, substituting the confirmed account email. This grants an existing account the ADMIN role without changing its password. Public registration never grants admin access based on an email or requested role.

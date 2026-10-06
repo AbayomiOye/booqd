@@ -1,6 +1,7 @@
 // app/api/services/route.js
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { recordActivity } from '@/lib/activity'
 import { getSession } from '@/lib/auth'
 
 export async function POST(req) {
@@ -20,8 +21,12 @@ export async function POST(req) {
     const provider = await prisma.provider.findFirst({ where: { id: providerId, userId: session.id } })
     if (!provider) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-    const service = await prisma.service.create({
+    const service = await prisma.$transaction(async tx => {
+      const saved = await tx.service.create({
       data: { providerId, serviceName, description, durationMin, price },
+      })
+      await recordActivity(tx, session.id, 'SERVICE_CREATED', `${session.name} added ${serviceName}`, { serviceId: saved.id, providerId })
+      return saved
     })
     return NextResponse.json(service)
   } catch (err) {

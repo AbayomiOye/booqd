@@ -17,6 +17,7 @@ model User {
   role         Role     @default(CLIENT)
   createdAt    DateTime @default(now())
 
+  activities   Activity[]
   provider     Provider?
   appointments Appointment[] @relation("ClientAppointments")
 }
@@ -97,4 +98,18 @@ enum AppointmentStatus {
   CONFIRMED
   CANCELLED
   COMPLETED
+}
+
+model Activity {
+  id        Int      @id @default(autoincrement())
+  actorId   Int?
+  actor     User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action    String
+  summary   String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([actorId, createdAt])
+  @@index([action, createdAt])
 }

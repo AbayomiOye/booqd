@@ -2,17 +2,19 @@
 import { NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
+import { recordActivity } from '@/lib/activity'
 import { signToken } from '@/lib/auth'
 import { cookies } from 'next/headers'
 
 export async function POST(req) {
   try {
-    const { email, password } = await req.json()
-    if (!email || !password) {
+    const { email: rawEmail, password } = await req.json()
+    const email = typeof rawEmail === 'string' ? rawEmail.trim().toLowerCase() : ''
+    if (!email || typeof password !== 'string' || !password) {
       return NextResponse.json({ error: 'Email and password are required' }, { status: 400 })
     }
 
-    const user = await prisma.user.findUnique({ where: { email } })
+    const user = await prisma.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } })
     if (!user) {
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
     }
@@ -23,6 +25,7 @@ export async function POST(req) {
     }
 
     const token = signToken({ id: user.id, name: user.name, email: user.email, role: user.role })
+    await recordActivity(prisma, user.id, 'SIGNED_IN', `${user.name} signed in`)
     const cookieStore = await cookies()
     cookieStore.set('auth_token', token, {
       httpOnly: true,

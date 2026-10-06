@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { recordActivity } from '@/lib/activity'
 import { getSession } from '@/lib/auth'
 import { getSlots } from '@/lib/availability.cjs'
 import { parseBooking } from '@/lib/booking-rules.cjs'
@@ -27,10 +28,12 @@ export async function POST(req) {
         apptDate: { lt: endsAt }, endsAt: { gt: apptDate },
       } })
       if (conflict) throw Object.assign(new Error('This time slot is already booked. Please choose another time.'), { status: 409 })
-      return tx.appointment.create({ data: {
+      const saved = await tx.appointment.create({ data: {
         clientId: session.id, serviceId, providerId, apptDate, endsAt,
         serviceName: service.serviceName, price: service.price, durationMin: service.durationMin,
       } })
+      await recordActivity(tx, session.id, 'BOOKING_CREATED', `${session.name} requested ${service.serviceName}`, { bookingId: saved.id, providerId })
+      return saved
     })
     return NextResponse.json({ success: true, appointmentId: appointment.id, appointment }, { status: 201 })
   } catch (err) {

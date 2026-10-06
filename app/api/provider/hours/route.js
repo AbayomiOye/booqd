@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { recordActivity } from '@/lib/activity'
 import { getSession } from '@/lib/auth'
 import { validateHours } from '@/lib/availability.cjs'
 export async function PATCH(req) {
@@ -12,7 +13,9 @@ export async function PATCH(req) {
       const provider = await tx.provider.findUnique({ where: { userId: session.id } })
       if (!provider) return null
       await tx.$queryRaw`SELECT id FROM "Provider" WHERE id = ${provider.id} FOR UPDATE`
-      return tx.provider.update({ where: { id: provider.id }, data: { openingHours } })
+      const saved = await tx.provider.update({ where: { id: provider.id }, data: { openingHours } })
+      await recordActivity(tx, session.id, 'HOURS_UPDATED', `${session.name} updated working hours`, { providerId: provider.id })
+      return saved
     })
     if (!result) return NextResponse.json({ error: 'Provider not found' }, { status: 404 })
     return NextResponse.json({ openingHours: result.openingHours })

@@ -1,6 +1,7 @@
 // app/api/services/[id]/route.js
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { recordActivity } from '@/lib/activity'
 import { getSession } from '@/lib/auth'
 
 export async function DELETE(req, { params }) {
@@ -20,7 +21,10 @@ export async function DELETE(req, { params }) {
     }
     const bookings = await prisma.appointment.count({ where: { serviceId: service.id } })
     if (bookings) return NextResponse.json({ error: 'This service has booking history and cannot be deleted' }, { status: 409 })
-    await prisma.service.delete({ where: { id: parseInt(params.id) } })
+    await prisma.$transaction(async tx => {
+      await tx.service.delete({ where: { id: service.id } })
+      await recordActivity(tx, session.id, 'SERVICE_REMOVED', `${session.name} removed ${service.serviceName}`, { serviceId: service.id, providerId: service.providerId })
+    })
     return NextResponse.json({ success: true })
   } catch (err) {
     console.error(err)

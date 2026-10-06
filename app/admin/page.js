@@ -1,154 +1,42 @@
-// app/admin/page.js
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
+import { getAdminDashboard, ADMIN_TABS, ACTIVITY_ACTIONS } from '@/lib/admin-dashboard'
 import Navbar from '@/components/layout/Navbar'
-
-export default async function AdminPage() {
+import Icon from '@/components/Icon'
+import RefreshButton from './RefreshButton'
+const titles = { overview: 'Overview', activity: 'Activity', bookings: 'Bookings', providers: 'Providers', users: 'Users' }
+const money = amount => `₦${amount.toLocaleString()}`
+const when = date => new Date(date).toLocaleString('en-NG', { timeZone: 'Africa/Lagos', dateStyle: 'medium', timeStyle: 'short' }) + ' WAT'
+const labels = { PENDING: ['Pending', 'badge-yellow'], CONFIRMED: ['Confirmed', 'badge-green'], CANCELLED: ['Cancelled', 'badge-gray'], COMPLETED: ['Completed', 'badge-purple'] }
+const actionLabel = value => value.toLowerCase().replaceAll('_', ' ')
+export default async function AdminPage({ searchParams }) {
   const session = await getSession()
-  if (!session || session.role !== 'ADMIN') redirect('/login')
-
-  const [users, providers, appointments] = await Promise.all([
-    prisma.user.findMany({ orderBy: { createdAt: 'desc' }, take: 20 }),
-    prisma.provider.findMany({
-      include: { user: { select: { name: true, email: true } }, _count: { select: { appointments: true } } },
-      orderBy: { createdAt: 'desc' },
-    }),
-    prisma.appointment.findMany({
-      include: {
-        client: { select: { name: true } },
-        provider: { select: { businessName: true } },
-        service: { select: { serviceName: true, price: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 20,
-    }),
-  ])
-
-  const stats = {
-    users: users.length,
-    providers: providers.length,
-    appointments: appointments.length,
-    revenue: appointments
-      .filter(a => a.status === 'COMPLETED')
-      .reduce((sum, a) => sum + (a.price || 0), 0),
-  }
-
-  const statusColors = { PENDING:'badge-yellow', CONFIRMED:'badge-green', CANCELLED:'badge-red', COMPLETED:'badge-gray' }
-
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Admin Panel</h1>
-        <p className="text-gray-500 mb-8">Platform overview and management</p>
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-10">
-          {[
-            { label: 'Total Users', value: stats.users, icon: '👤' },
-            { label: 'Providers', value: stats.providers, icon: '💼' },
-            { label: 'Appointments', value: stats.appointments, icon: '🗓' },
-            { label: 'Revenue (completed)', value: `₦${stats.revenue.toLocaleString()}`, icon: '💰' },
-          ].map(s => (
-            <div key={s.label} className="card p-5">
-              <div className="text-2xl mb-1">{s.icon}</div>
-              <div className="text-2xl font-bold text-gray-900">{s.value}</div>
-              <div className="text-sm text-gray-500">{s.label}</div>
-            </div>
-          ))}
-        </div>
-
-        <div className="grid lg:grid-cols-2 gap-8">
-          {/* Providers table */}
-          <div className="card p-6">
-            <h2 className="font-bold text-gray-900 mb-4">Providers</h2>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-gray-500 border-b border-gray-100">
-                    <th className="pb-2 font-medium">Business</th>
-                    <th className="pb-2 font-medium">Location</th>
-                    <th className="pb-2 font-medium">Bookings</th>
-                    <th className="pb-2 font-medium">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {providers.map(p => (
-                    <tr key={p.id}>
-                      <td className="py-2.5">
-                        <p className="font-medium text-gray-900">{p.businessName}</p>
-                        <p className="text-xs text-gray-400">{p.user.email}</p>
-                      </td>
-                      <td className="py-2.5 text-gray-600">{p.location}</td>
-                      <td className="py-2.5 text-gray-600">{p._count.appointments}</td>
-                      <td className="py-2.5">
-                        <span className={p.verified ? 'badge-green' : 'badge-yellow'}>
-                          {p.verified ? 'Verified' : 'Pending'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Recent appointments */}
-          <div className="card p-6">
-            <h2 className="font-bold text-gray-900 mb-4">Recent Appointments</h2>
-            <div className="space-y-3">
-              {appointments.slice(0, 8).map(a => (
-                <div key={a.id} className="flex items-start gap-3 py-2 border-b border-gray-50 last:border-0">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 truncate">{a.client.name}</p>
-                    <p className="text-xs text-gray-500">
-                      {a.serviceName} @ {a.provider.businessName}
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      {new Date(a.apptDate).toLocaleDateString('en-NG', { timeZone:'Africa/Lagos', day:'numeric', month:'short' })}
-                    </p>
-                  </div>
-                  <span className={statusColors[a.status] || 'badge-gray'}>{a.status}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Users table */}
-        <div className="card p-6 mt-8">
-          <h2 className="font-bold text-gray-900 mb-4">All Users</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-gray-500 border-b border-gray-100">
-                  <th className="pb-2 font-medium">Name</th>
-                  <th className="pb-2 font-medium">Email</th>
-                  <th className="pb-2 font-medium">Role</th>
-                  <th className="pb-2 font-medium">Joined</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {users.map(u => (
-                  <tr key={u.id}>
-                    <td className="py-2.5 font-medium text-gray-900">{u.name}</td>
-                    <td className="py-2.5 text-gray-600">{u.email}</td>
-                    <td className="py-2.5">
-                      <span className={u.role === 'ADMIN' ? 'badge-purple' : u.role === 'PROVIDER' ? 'badge-green' : 'badge-gray'}>
-                        {u.role}
-                      </span>
-                    </td>
-                    <td className="py-2.5 text-gray-400">
-                      {new Date(u.createdAt).toLocaleDateString('en-NG', { day:'numeric', month:'short', year:'numeric' })}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
+  if (!session) redirect('/login')
+  if (session.role !== 'ADMIN') redirect('/search')
+  const params = await searchParams
+  const data = await getAdminDashboard(params)
+  const { tab, rows, stats, total, page, pageSize, trend } = data
+  const href = changes => `/admin?${new URLSearchParams({ ...Object.fromEntries(Object.entries(params || {}).filter(([, value]) => typeof value === 'string')), ...changes })}`
+  const empty = <div className="py-10 text-center"><Icon name="calendar" className="mx-auto h-10 w-10 text-brand-400" /><h3 className="mt-4 font-semibold">No matching activity yet</h3><p className="mt-2 text-sm text-gray-600">New records will appear here. Try a wider date range or clear your search.</p></div>
+  const activities = (tab === 'overview' || tab === 'activity') && <div className="divide-y divide-gray-100">{rows.map(event => <article key={event.id} className="flex flex-wrap items-start justify-between gap-3 py-4"><div className="min-w-0 flex-1"><span className="badge-purple capitalize">{actionLabel(event.action)}</span><h3 className="mt-2 font-medium break-words">{event.summary}</h3><p className="mt-1 break-all text-sm text-gray-600">{event.actor ? `${event.actor.name} · ${event.actor.email}` : 'System / operator'}</p></div><time dateTime={event.createdAt.toISOString()} className="text-xs text-gray-600">{when(event.createdAt)}</time></article>)}</div>
+  return <div className="min-h-screen"><Navbar /><main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+    <header className="mb-8 flex flex-wrap items-start justify-between gap-4"><div><p className="eyebrow">Booq’d administration</p><h1 className="mt-3 text-3xl font-bold">Platform activity</h1><p className="mt-2 break-all text-sm text-gray-600">Welcome, {session.name}. Signed in as {session.email}.</p></div><RefreshButton /></header>
+    <nav aria-label="Admin sections" className="mb-6 flex flex-wrap gap-2">{ADMIN_TABS.map(t => <Link key={t} href={href({ tab: t, page: '1', q: '', action: '', status: '', role: '', verified: '' })} aria-current={tab === t ? 'page' : undefined} className={tab === t ? 'btn-primary' : 'btn-outline'}>{titles[t]}</Link>)}</nav>
+    <section aria-label="Platform totals" className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">{[['Total users', stats.userCount], ['Providers', stats.providerCount], ['Total bookings', stats.bookingCount], ['Awaiting verification', stats.unverifiedCount]].map(([label, value]) => <div key={label} className="card p-4 sm:p-5"><p className="text-sm text-gray-600">{label}</p><p className="mt-2 text-3xl font-semibold">{value.toLocaleString()}</p></div>)}</section>
+    <p className="mb-6 text-xs text-gray-600">Totals cover all time. Dates and times use Nigeria time (WAT).</p>
+    {tab === 'overview' && <div className="mb-6 grid gap-6 lg:grid-cols-2"><section className="card p-5 sm:p-6"><h2 className="text-lg font-semibold">Bookings by status</h2><dl className="mt-4 grid grid-cols-2 gap-4">{Object.entries(labels).map(([status, [label, color]]) => <div key={status} className="rounded-xl bg-gray-50 p-4"><dt className={color}>{label}</dt><dd className="mt-2 text-2xl font-semibold">{stats.statusCounts[status] || 0}</dd></div>)}</dl><p className="mt-5 text-sm text-gray-600">Completed service value</p><p className="mt-1 text-2xl font-semibold">{money(stats.completedValue)}</p><p className="mt-2 text-xs text-gray-600">Service prices for completed bookings. This is not collected revenue; Booq’d does not process payments.</p></section><section className="card p-5 sm:p-6"><h2 className="text-lg font-semibold">Booking requests · last 14 days</h2><p className="mt-2 text-sm text-gray-600">{trend.reduce((sum, day) => sum + day.count, 0)} requests in this period.</p><div className="mt-6 flex h-32 items-end gap-1.5" aria-hidden="true">{trend.map(d => <div key={d.day} className="flex min-w-0 flex-1 items-end h-full"><div title={`${d.day}: ${d.count}`} className={`w-full rounded-t ${d.count ? 'bg-brand-600' : 'bg-gray-200'}`} style={{ height: `${Math.max(3, 100 * d.count / Math.max(1, ...trend.map(t => t.count)))}%` }} /></div>)}</div><div className="mt-2 flex justify-between text-xs text-gray-600"><span>{trend[0]?.day}</span><span>{trend.at(-1)?.day}</span></div><details className="mt-5 text-sm"><summary className="min-h-11 cursor-pointer py-3 font-medium text-brand-700">View daily counts</summary><dl className="space-y-2">{trend.map(d => <div className="flex justify-between" key={d.day}><dt>{d.day}</dt><dd>{d.count}</dd></div>)}</dl></details></section></div>}
+    <section className="card p-5 sm:p-6"><div className="mb-5 flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-semibold">{tab === 'overview' ? 'Recent activity' : titles[tab]}</h2><p className="text-sm text-gray-600">{total.toLocaleString()} matching records</p></div>
+      <form action="/admin" className="mb-6 grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-4"><input type="hidden" name="tab" value={tab} /><div><label htmlFor="admin-q" className="label">Search {tab === 'overview' ? 'activity' : tab}</label><input id="admin-q" name="q" defaultValue={data.q} className="input" placeholder="Name, business, or activity…" /></div><div><label htmlFor="admin-range" className="label">Date range</label><select id="admin-range" name="range" className="input" defaultValue={data.range}><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option><option value="all">All time</option></select></div>
+        {(tab === 'activity' || tab === 'overview') && <div><label htmlFor="admin-action" className="label">Activity type</label><select id="admin-action" name="action" className="input capitalize" defaultValue={params?.action || ''}><option value="">All activity</option>{ACTIVITY_ACTIONS.map(a => <option key={a} value={a}>{actionLabel(a)}</option>)}</select></div>}
+        {tab === 'bookings' && <div><label htmlFor="admin-status" className="label">Booking status</label><select id="admin-status" name="status" className="input" defaultValue={params?.status || ''}><option value="">All statuses</option>{Object.entries(labels).map(([s, [label]]) => <option key={s} value={s}>{label}</option>)}</select></div>}
+        {tab === 'providers' && <div><label htmlFor="admin-verified" className="label">Verification</label><select id="admin-verified" name="verified" className="input" defaultValue={params?.verified || ''}><option value="">All providers</option><option value="yes">Verified</option><option value="no">Awaiting verification</option></select></div>}
+        {tab === 'users' && <div><label htmlFor="admin-role" className="label">Account role</label><select id="admin-role" name="role" className="input" defaultValue={params?.role || ''}><option value="">All roles</option>{['CLIENT', 'PROVIDER', 'ADMIN'].map(r => <option key={r} value={r}>{r.toLowerCase()}</option>)}</select></div>}
+        <button className="btn-primary" type="submit">Apply filters</button>
+      </form>
+      {(tab === 'overview' || tab === 'activity') && <p className="mb-4 text-xs text-gray-600">Activity tracking begins with this dashboard release. Earlier records remain in Users, Providers and Bookings.</p>}
+      {!rows.length ? empty : tab === 'overview' || tab === 'activity' ? activities : <div className="divide-y divide-gray-100">{rows.map(row => <article key={row.id} className="py-5">{tab === 'bookings' ? <><div className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-semibold">#{row.id} · {row.serviceName}</h3><span className={labels[row.status][1]}>{labels[row.status][0]}</span></div><p className="mt-2 text-sm text-gray-600">{row.client.name} · {row.provider.businessName}</p><p className="mt-2 text-sm">{when(row.apptDate)} · {money(row.price)}</p><p className="mt-1 text-xs text-gray-600">Requested {when(row.createdAt)}</p></> : tab === 'providers' ? <><div className="flex flex-wrap items-center justify-between gap-3"><Link href={`/providers/${row.id}`} className="font-semibold text-brand-700">{row.businessName}</Link><span className={row.verified ? 'badge-green' : 'badge-yellow'}>{row.verified ? 'Verified' : 'Awaiting verification'}</span></div><p className="mt-2 break-all text-sm text-gray-600">{row.user.name} · {row.user.email}</p><p className="mt-2 text-sm">{row.location} · {row._count.services} services · {row._count.appointments} bookings</p><p className="mt-1 text-xs text-gray-600">Joined {when(row.createdAt)}</p></> : <><div className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-semibold">{row.name}</h3><span className="badge-purple">{row.role.toLowerCase()}</span></div><p className="mt-2 break-all text-sm text-gray-600">{row.email}</p><p className="mt-1 text-xs text-gray-600">Joined {when(row.createdAt)}</p></>}</article>)}</div>}
+      {tab === 'overview' ? <Link href={href({ tab: 'activity', page: '1' })} className="btn-outline mt-5">View full activity</Link> : <nav aria-label="Pagination" className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-5">{page > 1 ? <Link className="btn-outline" href={href({ page: String(page - 1) })}>Previous</Link> : <span />}<p className="text-sm text-gray-600">Page {page} of {Math.max(1, Math.ceil(total / pageSize))}</p>{page * pageSize < total ? <Link className="btn-outline" href={href({ page: String(page + 1) })}>Next</Link> : <span />}</nav>}
+    </section>
+  </main></div>
 }
