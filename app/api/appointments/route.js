@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
+import { getSlots } from '@/lib/availability.cjs'
 import { parseBooking } from '@/lib/booking-rules.cjs'
 
 export async function POST(req) {
@@ -8,14 +9,18 @@ export async function POST(req) {
     const session = await getSession()
     if (!session) return NextResponse.json({ error: 'You must be signed in to book' }, { status: 401 })
     let booking
-    try { booking = parseBooking(await req.json()) }
+    let input
+    try { input = await req.json(); booking = parseBooking(input) }
     catch (err) { return NextResponse.json({ error: err.message }, { status: 400 }) }
     const { serviceId, providerId, apptDate } = booking
     const appointment = await prisma.$transaction(async tx => {
       // All bookings for this provider share a transaction-scoped lock.
       await tx.$queryRaw`SELECT id FROM "Provider" WHERE id = ${providerId} FOR UPDATE`
-      const service = await tx.service.findFirst({ where: { id: serviceId, providerId } })
+      const service = await tx.service.findFirst({ where: { id: serviceId, providerId }, include: { provider: { select: { openingHours: true } } } })
       if (!service) throw Object.assign(new Error('Service not found'), { status: 404 })
+      if (!getSlots({ date: input.date, durationMin: service.durationMin, openingHours: service.provider.openingHours }).some(s => s.time === input.time && s.available)) {
+        throw Object.assign(new Error('This appointment falls outside the provider’s working hours'), { status: 400 })
+      }
       const endsAt = new Date(apptDate.getTime() + service.durationMin * 60000)
       const conflict = await tx.appointment.findFirst({ where: {
         providerId, status: { in: ['PENDING', 'CONFIRMED'] },

@@ -31,4 +31,8 @@ The app retains its own account system; Supabase supplies Postgres. Browser `ano
 - Add rate limiting for login, registration and booking endpoints; email verification/password recovery; and monitoring/backups appropriate to the release.
 - Demo data uses known passwords. Seed only a disposable development database with `ALLOW_DEMO_SEED=true npm run db:seed`; production seeding is blocked.
 
-Payments, notifications, configurable provider opening hours and portfolio uploads are not implemented in this change.
+UI upgrades add live service availability, a booking review step, accessible search/location/budget/category filters, upcoming/past booking history, saved weekly provider hours and a provider calendar. Availability returns only time slots, never customer details. Booking creation validates the saved schedule inside the existing provider lock. Changing hours does not alter existing appointments.
+
+Run the 11 Playwright scenarios with `npm run test:e2e`. To verify an already deployed site, set `PLAYWRIGHT_BASE_URL=https://booqd-wine.vercel.app` when running that command. The suite still uses the database from `.env` for its disposable fixtures, so it must match the deployed project.
+
+Payments, notifications, review collection and portfolio uploads are not implemented. Portfolio displays use actual saved images or clearly neutral placeholders.

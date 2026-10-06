@@ -6,8 +6,8 @@ const valid = { serviceId: 1, providerId: 2, date: '2026-10-07', time: '09:00' }
 test('Nigeria appointment time has a stable UTC representation', () => {
   assert.equal(parseBooking(valid, now).apptDate.toISOString(), '2026-10-07T08:00:00.000Z')
 })
-test('rejects malformed, past, impossible and out-of-hours bookings', () => {
-  for (const change of [{ serviceId: '1' }, { providerId: -1 }, { date: '2026-02-30' }, { date: '2026-10-05' }, { time: '25:00' }, { time: '08:30' }, { time: '09:15' }]) {
+test('rejects malformed, past, impossible and invalid time increments', () => {
+  for (const change of [{ serviceId: '1' }, { providerId: -1 }, { date: '2026-02-30' }, { date: '2026-10-05' }, { time: '25:00' }, { time: '24:00' }, { time: '09:15' }]) {
     assert.throws(() => parseBooking({ ...valid, ...change }, now))
   }
 })

@@ -6,7 +6,7 @@ export default async function Navbar() {
   const session = await getSession()
 
   return (
-    <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
+    <nav aria-label="Main navigation" className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2">
@@ -48,6 +48,11 @@ export default async function Navbar() {
             </>
           )}
         </div>
+      </div>
+      <div className="flex gap-2 border-t border-gray-100 px-4 py-1 md:hidden">
+        <Link href="/search" className="btn-ghost text-sm">Find services</Link>
+        {session?.role === 'PROVIDER' && <Link href="/provider" className="btn-ghost text-sm">Dashboard</Link>}
+        {session?.role === 'ADMIN' && <Link href="/admin" className="btn-ghost text-sm">Admin</Link>}
       </div>
     </nav>
   )

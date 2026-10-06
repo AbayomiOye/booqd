@@ -47,12 +47,12 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="label">Email address</label>
-              <input className="input" type="email" placeholder="you@email.com" value={form.email} onChange={e => setForm(f => ({...f, email: e.target.value}))} required />
+              <label htmlFor="field-1" className="label">Email address</label>
+              <input id="field-1" className="input" type="email" placeholder="you@email.com" value={form.email} onChange={e => setForm(f => ({...f, email: e.target.value}))} required />
             </div>
             <div>
-              <label className="label">Password</label>
-              <input className="input" type="password" placeholder="••••••••" value={form.password} onChange={e => setForm(f => ({...f, password: e.target.value}))} required />
+              <label htmlFor="field-2" className="label">Password</label>
+              <input id="field-2" className="input" type="password" placeholder="••••••••" value={form.password} onChange={e => setForm(f => ({...f, password: e.target.value}))} required />
             </div>
             <button type="submit" className="btn-primary w-full py-3" disabled={loading}>
               {loading ? 'Signing in...' : 'Sign in'}

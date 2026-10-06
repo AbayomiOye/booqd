@@ -56,3 +56,19 @@
     @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700;
   }
 }
+
+@layer base {
+  html { scroll-behavior: smooth; }
+  button, select, a { -webkit-tap-highlight-color: transparent; }
+  button, a { cursor: pointer; }
+  button:disabled { cursor: not-allowed; }
+  :focus-visible { outline: 3px solid #8b24ae; outline-offset: 3px; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+}
+@layer components {
+  .btn-primary, .btn-outline, .btn-ghost, .input { min-height: 44px; }
+  .eyebrow { @apply text-xs font-semibold uppercase tracking-widest text-brand-700; }
+}
